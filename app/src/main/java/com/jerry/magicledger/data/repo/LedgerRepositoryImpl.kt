@@ -47,6 +47,19 @@ class LedgerRepositoryImpl(
         }
     }
 
+    override fun observeMonthlyCategorySummary(month: YearMonth): Flow<List<CategorySummaryItem>> {
+        val (startMillis, endMillis) = month.toMillisRange()
+        return transactionDao.observeCategorySummaryByMonth(startMillis, endMillis).map { rows ->
+            rows.map {
+                CategorySummaryItem(
+                    categoryName = it.categoryName,
+                    type = it.type,
+                    totalAmount = it.totalAmount,
+                )
+            }
+        }
+    }
+
     override fun observeBudget(month: YearMonth): Flow<Double?> {
         return budgetDao.observeByMonth(month.toMonthKey()).map { it?.budgetAmount }
     }

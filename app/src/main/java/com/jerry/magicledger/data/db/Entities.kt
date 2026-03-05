@@ -44,3 +44,9 @@ data class MonthlySummaryRow(
     @ColumnInfo(name = "income") val income: Double,
     @ColumnInfo(name = "expense") val expense: Double,
 )
+
+data class CategorySummaryRow(
+    @ColumnInfo(name = "categoryName") val categoryName: String,
+    @ColumnInfo(name = "type") val type: TransactionType,
+    @ColumnInfo(name = "totalAmount") val totalAmount: Double,
+)

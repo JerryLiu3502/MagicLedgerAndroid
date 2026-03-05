@@ -23,11 +23,18 @@ data class TransactionItem(
     val dateMillis: Long,
 )
 
+data class CategorySummaryItem(
+    val categoryName: String,
+    val type: TransactionType,
+    val totalAmount: Double,
+)
+
 interface LedgerRepository {
     fun observeTransactions(): Flow<List<TransactionItem>>
     fun observeAllCategories(): Flow<List<CategoryEntity>>
     fun observeCategoriesByType(type: TransactionType): Flow<List<CategoryEntity>>
     fun observeMonthlySummary(month: YearMonth): Flow<MonthlySummary>
+    fun observeMonthlyCategorySummary(month: YearMonth): Flow<List<CategorySummaryItem>>
     fun observeBudget(month: YearMonth): Flow<Double?>
 
     suspend fun addTransaction(

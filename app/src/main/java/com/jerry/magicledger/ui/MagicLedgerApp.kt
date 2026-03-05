@@ -17,6 +17,7 @@ import com.jerry.magicledger.data.repo.LedgerRepository
 import com.jerry.magicledger.ui.screens.BudgetRoute
 import com.jerry.magicledger.ui.screens.CategoryRoute
 import com.jerry.magicledger.ui.screens.HomeRoute
+import com.jerry.magicledger.ui.screens.StatsRoute
 
 private enum class AppTab(
     val title: String,
@@ -25,6 +26,7 @@ private enum class AppTab(
     Ledger("账本", "📒"),
     Categories("分类", "🏷️"),
     Budget("预算", "💰"),
+    Stats("统计", "📊"),
 }
 
 @Composable
@@ -54,6 +56,7 @@ fun MagicLedgerApp(repository: LedgerRepository) {
                 AppTab.Ledger -> HomeRoute(repository = repository)
                 AppTab.Categories -> CategoryRoute(repository = repository)
                 AppTab.Budget -> BudgetRoute(repository = repository)
+                AppTab.Stats -> StatsRoute(repository = repository)
             }
         }
     }

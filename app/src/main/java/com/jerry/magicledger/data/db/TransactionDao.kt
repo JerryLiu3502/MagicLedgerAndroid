@@ -65,4 +65,19 @@ interface TransactionDao {
         """,
     )
     fun observeMonthlySummary(startMillis: Long, endMillis: Long): Flow<MonthlySummaryRow>
+
+    @Query(
+        """
+        SELECT
+            COALESCE(c.name, 'Unknown') AS categoryName,
+            t.type AS type,
+            COALESCE(SUM(t.amount), 0) AS totalAmount
+        FROM transactions t
+        LEFT JOIN categories c ON t.categoryId = c.id
+        WHERE t.dateMillis >= :startMillis AND t.dateMillis < :endMillis
+        GROUP BY t.type, t.categoryId, c.name
+        ORDER BY t.type ASC, totalAmount DESC
+        """,
+    )
+    fun observeCategorySummaryByMonth(startMillis: Long, endMillis: Long): Flow<List<CategorySummaryRow>>
 }
