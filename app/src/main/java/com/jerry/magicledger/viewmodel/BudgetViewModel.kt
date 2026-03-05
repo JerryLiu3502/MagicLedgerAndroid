@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jerry.magicledger.data.repo.LedgerRepository
 import com.jerry.magicledger.data.repo.MonthlySummary
+import com.jerry.magicledger.utils.parseAmountOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -71,8 +72,8 @@ class BudgetViewModel(
 
     fun saveBudget() {
         viewModelScope.launch {
-            val parsed = budgetInput.value.toDoubleOrNull()
-            if (parsed == null || parsed <= 0.0) {
+            val parsed = parseAmountOrNull(budgetInput.value)
+            if (parsed == null) {
                 infoText.value = "请输入有效预算金额"
                 return@launch
             }

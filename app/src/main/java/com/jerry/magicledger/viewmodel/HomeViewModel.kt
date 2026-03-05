@@ -8,6 +8,7 @@ import com.jerry.magicledger.data.db.CategoryEntity
 import com.jerry.magicledger.data.repo.LedgerRepository
 import com.jerry.magicledger.data.repo.MonthlySummary
 import com.jerry.magicledger.data.repo.TransactionItem
+import com.jerry.magicledger.utils.parseAmountOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -152,8 +153,8 @@ class HomeViewModel(
 
     fun addTransaction() {
         viewModelScope.launch {
-            val amount = amountInput.value.toDoubleOrNull()
-            if (amount == null || amount <= 0.0) {
+            val amount = parseAmountOrNull(amountInput.value)
+            if (amount == null) {
                 infoText.value = "请输入有效金额"
                 return@launch
             }
