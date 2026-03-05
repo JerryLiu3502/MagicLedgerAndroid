@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.jerry.magicledger.data.TransactionType
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -16,6 +17,26 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query(
+        """
+        UPDATE transactions
+        SET amount = :amount,
+            type = :type,
+            categoryId = :categoryId,
+            note = :note,
+            dateMillis = :dateMillis
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateById(
+        id: Long,
+        amount: Double,
+        type: TransactionType,
+        categoryId: Long,
+        note: String,
+        dateMillis: Long,
+    ): Int
 
     @Query(
         """

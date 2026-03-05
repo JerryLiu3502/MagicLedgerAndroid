@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -42,6 +43,8 @@ data class HomeUiState(
     val budgetAmount: Double? = null,
     val budgetWarningText: String = "",
     val groupedTransactions: List<TransactionDayGroup> = emptyList(),
+    val editingTransactionId: Long? = null,
+    val submitButtonText: String = "保存记录",
     val infoText: String? = null,
 )
 
@@ -55,6 +58,7 @@ class HomeViewModel(
     private val selectedCategoryId = MutableStateFlow<Long?>(null)
     private val noteInput = MutableStateFlow("")
     private val dateInput = MutableStateFlow(DateTimeFormatter.ISO_LOCAL_DATE.format(LocalDate.now()))
+    private val editingTransactionId = MutableStateFlow<Long?>(null)
     private val infoText = MutableStateFlow<String?>(null)
 
     private val categoryFlow = selectedType.flatMapLatest { type ->
@@ -83,6 +87,7 @@ class HomeViewModel(
         summaryFlow,
         budgetFlow,
         selectedMonth,
+        editingTransactionId,
     ) { vals ->
         val amount = vals[0] as String
         val type = vals[1] as TransactionType
@@ -97,6 +102,7 @@ class HomeViewModel(
         val summary = vals[8] as MonthlySummary
         val budget = vals[9] as Double?
         val month = vals[10] as YearMonth
+        val editingId = vals[11] as Long?
 
         val resolvedCategoryId = categoryId?.takeIf { id -> categories.any { it.id == id } }
             ?: categories.firstOrNull()?.id
@@ -106,6 +112,9 @@ class HomeViewModel(
             summary.expense > budget -> "⚠ 已超预算：${(summary.expense - budget).toInt()} 元"
             else -> "预算剩余：${(budget - summary.expense).toInt()} 元"
         }
+
+        val (startMillis, endMillis) = month.toMillisRange()
+        val monthTransactions = transactions.filter { it.dateMillis in startMillis until endMillis }
 
         HomeUiState(
             amountInput = amount,
@@ -118,7 +127,9 @@ class HomeViewModel(
             summary = summary,
             budgetAmount = budget,
             budgetWarningText = budgetWarning,
-            groupedTransactions = transactions.toGroupedByDay(),
+            groupedTransactions = monthTransactions.toGroupedByDay(),
+            editingTransactionId = editingId,
+            submitButtonText = if (editingId == null) "保存记录" else "更新记录",
             infoText = info,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
@@ -149,6 +160,48 @@ class HomeViewModel(
         dateInput.value = value
     }
 
+    fun goPrevMonth() {
+        selectedMonth.value = selectedMonth.value.minusMonths(1)
+    }
+
+    fun goNextMonth() {
+        selectedMonth.value = selectedMonth.value.plusMonths(1)
+    }
+
+    fun goCurrentMonth() {
+        selectedMonth.value = YearMonth.now()
+    }
+
+    fun startEditTransaction(transactionId: Long) {
+        val target = uiState.value.groupedTransactions
+            .asSequence()
+            .flatMap { it.items.asSequence() }
+            .firstOrNull { it.id == transactionId }
+
+        if (target == null) {
+            infoText.value = "记录不存在，可能已被删除"
+            return
+        }
+
+        editingTransactionId.value = target.id
+        amountInput.value = target.amount.toAmountInputText()
+        selectedType.value = target.type
+        selectedCategoryId.value = target.categoryId
+        noteInput.value = target.note
+        dateInput.value = Instant.ofEpochMilli(target.dateMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .format(DateTimeFormatter.ISO_LOCAL_DATE)
+        infoText.value = "正在编辑记录"
+    }
+
+    fun cancelEditTransaction() {
+        editingTransactionId.value = null
+        amountInput.value = ""
+        noteInput.value = ""
+        infoText.value = "已取消编辑"
+    }
+
     fun dismissInfo() {
         infoText.value = null
     }
@@ -172,22 +225,49 @@ class HomeViewModel(
                 return@launch
             }
 
-            repository.addTransaction(
-                amount = amount,
-                type = selectedType.value,
-                categoryId = categoryId,
-                note = noteInput.value.trim(),
-                dateMillis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            )
+            val dateMillis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val editingId = editingTransactionId.value
+
+            if (editingId == null) {
+                repository.addTransaction(
+                    amount = amount,
+                    type = selectedType.value,
+                    categoryId = categoryId,
+                    note = noteInput.value.trim(),
+                    dateMillis = dateMillis,
+                )
+                infoText.value = "记账成功"
+            } else {
+                val updated = repository.updateTransaction(
+                    transactionId = editingId,
+                    amount = amount,
+                    type = selectedType.value,
+                    categoryId = categoryId,
+                    note = noteInput.value.trim(),
+                    dateMillis = dateMillis,
+                )
+                if (!updated) {
+                    editingTransactionId.value = null
+                    infoText.value = "记录不存在，可能已被删除"
+                    return@launch
+                }
+                editingTransactionId.value = null
+                infoText.value = "已更新记录"
+            }
+
             amountInput.value = ""
             noteInput.value = ""
-            infoText.value = "记账成功"
         }
     }
 
     fun deleteTransaction(transactionId: Long) {
         viewModelScope.launch {
             repository.deleteTransaction(transactionId)
+            if (editingTransactionId.value == transactionId) {
+                editingTransactionId.value = null
+                amountInput.value = ""
+                noteInput.value = ""
+            }
             infoText.value = "已删除记录"
         }
     }
@@ -218,4 +298,18 @@ private fun List<TransactionItem>.toGroupedByDay(): List<TransactionDayGroup> {
             items = items,
         )
     }
+}
+
+private fun YearMonth.toMillisRange(): Pair<Long, Long> {
+    val zone = ZoneId.systemDefault()
+    val start = atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    val end = plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    return start to end
+}
+
+private fun Double.toAmountInputText(): String {
+    if (this % 1.0 == 0.0) {
+        return toLong().toString()
+    }
+    return BigDecimal.valueOf(this).stripTrailingZeros().toPlainString()
 }

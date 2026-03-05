@@ -11,8 +11,9 @@ A Kotlin + Jetpack Compose daily bill tracking app inspired by **“魔法记账
 ## Core MVP Features
 
 - Add income/expense transaction (`amount`, `type`, `category`, `note`, `date`)
-- Transaction list grouped by day
-- Monthly summary (income, expense, balance)
+- Transaction list grouped by day (filtered by selected month)
+- Monthly summary (income, expense, balance) with month switch
+- Transaction edit/delete
 - Category management (preset + custom)
 - Monthly budget setting with over-budget warning text
 - Built-in sample data for first launch
@@ -43,8 +44,7 @@ A Kotlin + Jetpack Compose daily bill tracking app inspired by **“魔法记账
 
 ## Roadmap
 
-- Transaction edit/delete
-- Month switch and history reports
 - Data export/import
 - Widgets and reminders
+- Category-level statistics and charts
 - Cloud backup & multi-device sync

@@ -87,6 +87,25 @@ class LedgerRepositoryImpl(
         return true
     }
 
+    override suspend fun updateTransaction(
+        transactionId: Long,
+        amount: Double,
+        type: TransactionType,
+        categoryId: Long,
+        note: String,
+        dateMillis: Long,
+    ): Boolean {
+        val updatedRows = transactionDao.updateById(
+            id = transactionId,
+            amount = amount,
+            type = type,
+            categoryId = categoryId,
+            note = note,
+            dateMillis = dateMillis,
+        )
+        return updatedRows > 0
+    }
+
     override suspend fun deleteTransaction(transactionId: Long) {
         transactionDao.deleteById(transactionId)
     }

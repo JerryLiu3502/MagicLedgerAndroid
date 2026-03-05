@@ -60,6 +60,9 @@ private fun HomeScreen(viewModel: HomeViewModel) {
                 income = uiState.summary.income,
                 expense = uiState.summary.expense,
                 balance = uiState.summary.balance,
+                onPrevMonth = viewModel::goPrevMonth,
+                onNextMonth = viewModel::goNextMonth,
+                onCurrentMonth = viewModel::goCurrentMonth,
             )
         }
         item {
@@ -78,6 +81,8 @@ private fun HomeScreen(viewModel: HomeViewModel) {
                 selectedCategoryId = uiState.selectedCategoryId,
                 note = uiState.noteInput,
                 date = uiState.dateInput,
+                submitButtonText = uiState.submitButtonText,
+                isEditing = uiState.editingTransactionId != null,
                 infoText = uiState.infoText,
                 onAmountChange = viewModel::onAmountChange,
                 onTypeChange = viewModel::onTypeChange,
@@ -85,6 +90,7 @@ private fun HomeScreen(viewModel: HomeViewModel) {
                 onNoteChange = viewModel::onNoteChange,
                 onDateChange = viewModel::onDateChange,
                 onAddClick = viewModel::addTransaction,
+                onCancelEdit = viewModel::cancelEditTransaction,
             )
         }
         item {
@@ -99,7 +105,7 @@ private fun HomeScreen(viewModel: HomeViewModel) {
             item {
                 Card {
                     Text(
-                        text = "暂无记录，先添加一条吧。",
+                        text = "本月暂无记录，先添加一条吧。",
                         modifier = Modifier.padding(16.dp),
                     )
                 }
@@ -108,6 +114,7 @@ private fun HomeScreen(viewModel: HomeViewModel) {
             items(uiState.groupedTransactions) { group ->
                 TransactionDayGroupCard(
                     group = group,
+                    onEditClick = viewModel::startEditTransaction,
                     onDeleteClick = viewModel::deleteTransaction,
                 )
             }
@@ -121,13 +128,36 @@ private fun SummaryCard(
     income: Double,
     expense: Double,
     balance: Double,
+    onPrevMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onCurrentMonth: () -> Unit,
 ) {
     Card {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(text = "$monthLabel 月度汇总", style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onPrevMonth) {
+                    Text("← 上月")
+                }
+                Text(text = "$monthLabel 月度汇总", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = onNextMonth) {
+                    Text("下月 →")
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onCurrentMonth) {
+                    Text("回到本月")
+                }
+            }
             SummaryRow(label = "收入", value = income.toMoneyText(), color = Color(0xFF2E7D32))
             SummaryRow(label = "支出", value = expense.toMoneyText(), color = Color(0xFFC62828))
             SummaryRow(label = "结余", value = balance.toMoneyText(), color = MaterialTheme.colorScheme.primary)
@@ -158,6 +188,8 @@ private fun AddTransactionCard(
     selectedCategoryId: Long?,
     note: String,
     date: String,
+    submitButtonText: String,
+    isEditing: Boolean,
     infoText: String?,
     onAmountChange: (String) -> Unit,
     onTypeChange: (TransactionType) -> Unit,
@@ -165,13 +197,17 @@ private fun AddTransactionCard(
     onNoteChange: (String) -> Unit,
     onDateChange: (String) -> Unit,
     onAddClick: () -> Unit,
+    onCancelEdit: () -> Unit,
 ) {
     Card {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(text = "新增记账", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = if (isEditing) "编辑记录" else "新增记账",
+                style = MaterialTheme.typography.titleMedium,
+            )
 
             OutlinedTextField(
                 value = amount,
@@ -227,7 +263,16 @@ private fun AddTransactionCard(
                 onClick = onAddClick,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("保存记录")
+                Text(submitButtonText)
+            }
+
+            if (isEditing) {
+                TextButton(
+                    onClick = onCancelEdit,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text("取消编辑")
+                }
             }
 
             if (!infoText.isNullOrBlank()) {
@@ -244,6 +289,7 @@ private fun AddTransactionCard(
 @Composable
 private fun TransactionDayGroupCard(
     group: TransactionDayGroup,
+    onEditClick: (Long) -> Unit,
     onDeleteClick: (Long) -> Unit,
 ) {
     Card {
@@ -294,8 +340,13 @@ private fun TransactionDayGroupCard(
                             color = if (isIncome) Color(0xFF2E7D32) else Color(0xFFC62828),
                             fontWeight = FontWeight.Medium,
                         )
-                        TextButton(onClick = { onDeleteClick(item.id) }) {
-                            Text("删除")
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = { onEditClick(item.id) }) {
+                                Text("编辑")
+                            }
+                            TextButton(onClick = { onDeleteClick(item.id) }) {
+                                Text("删除")
+                            }
                         }
                     }
                 }
