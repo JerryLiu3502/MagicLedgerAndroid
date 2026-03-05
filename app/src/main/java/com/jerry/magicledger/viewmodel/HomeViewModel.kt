@@ -9,6 +9,7 @@ import com.jerry.magicledger.data.repo.LedgerRepository
 import com.jerry.magicledger.data.repo.MonthlySummary
 import com.jerry.magicledger.data.repo.TransactionItem
 import com.jerry.magicledger.utils.parseAmountOrNull
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +45,7 @@ data class HomeUiState(
     val infoText: String? = null,
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
     private val repository: LedgerRepository,
 ) : ViewModel() {
