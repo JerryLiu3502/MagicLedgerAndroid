@@ -39,6 +39,7 @@ interface LedgerRepository {
     )
 
     suspend fun addCategory(name: String, type: TransactionType): Boolean
+    suspend fun deleteTransaction(transactionId: Long)
     suspend fun setBudget(month: YearMonth, budgetAmount: Double)
     suspend fun seedIfNeeded()
 }

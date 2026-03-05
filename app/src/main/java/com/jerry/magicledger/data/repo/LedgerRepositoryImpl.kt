@@ -87,6 +87,10 @@ class LedgerRepositoryImpl(
         return true
     }
 
+    override suspend fun deleteTransaction(transactionId: Long) {
+        transactionDao.deleteById(transactionId)
+    }
+
     override suspend fun setBudget(month: YearMonth, budgetAmount: Double) {
         budgetDao.upsert(
             BudgetEntity(
