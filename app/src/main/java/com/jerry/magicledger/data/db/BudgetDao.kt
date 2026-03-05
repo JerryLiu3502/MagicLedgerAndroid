@@ -12,4 +12,10 @@ interface BudgetDao {
 
     @Query("SELECT * FROM budgets WHERE monthKey = :monthKey LIMIT 1")
     fun observeByMonth(monthKey: String): Flow<BudgetEntity?>
+
+    @Query("SELECT * FROM budgets ORDER BY monthKey ASC")
+    suspend fun getAllEntities(): List<BudgetEntity>
+
+    @Query("DELETE FROM budgets")
+    suspend fun deleteAll()
 }

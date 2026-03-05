@@ -29,6 +29,12 @@ data class CategorySummaryItem(
     val totalAmount: Double,
 )
 
+data class ImportResult(
+    val categoryCount: Int,
+    val transactionCount: Int,
+    val budgetCount: Int,
+)
+
 interface LedgerRepository {
     fun observeTransactions(): Flow<List<TransactionItem>>
     fun observeAllCategories(): Flow<List<CategoryEntity>>
@@ -57,5 +63,7 @@ interface LedgerRepository {
 
     suspend fun deleteTransaction(transactionId: Long)
     suspend fun setBudget(month: YearMonth, budgetAmount: Double)
+    suspend fun exportDataAsJson(): String
+    suspend fun importDataFromJson(rawJson: String): ImportResult
     suspend fun seedIfNeeded()
 }

@@ -18,6 +18,12 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAll()
+
+    @Query("SELECT * FROM transactions ORDER BY dateMillis ASC, createdAt ASC")
+    suspend fun getAllEntities(): List<TransactionEntity>
+
     @Query(
         """
         UPDATE transactions

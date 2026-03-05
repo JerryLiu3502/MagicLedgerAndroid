@@ -26,4 +26,10 @@ interface CategoryDao {
 
     @Query("SELECT * FROM categories WHERE LOWER(name) = LOWER(:name) AND type = :type LIMIT 1")
     suspend fun findByNameAndType(name: String, type: TransactionType): CategoryEntity?
+
+    @Query("SELECT * FROM categories ORDER BY id ASC")
+    suspend fun getAllEntities(): List<CategoryEntity>
+
+    @Query("DELETE FROM categories")
+    suspend fun deleteAll()
 }

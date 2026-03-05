@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import com.jerry.magicledger.data.repo.LedgerRepository
 import com.jerry.magicledger.ui.screens.BudgetRoute
 import com.jerry.magicledger.ui.screens.CategoryRoute
+import com.jerry.magicledger.ui.screens.DataRoute
 import com.jerry.magicledger.ui.screens.HomeRoute
 import com.jerry.magicledger.ui.screens.StatsRoute
 
@@ -27,6 +28,7 @@ private enum class AppTab(
     Categories("分类", "🏷️"),
     Budget("预算", "💰"),
     Stats("统计", "📊"),
+    Data("数据", "💾"),
 }
 
 @Composable
@@ -57,6 +59,7 @@ fun MagicLedgerApp(repository: LedgerRepository) {
                 AppTab.Categories -> CategoryRoute(repository = repository)
                 AppTab.Budget -> BudgetRoute(repository = repository)
                 AppTab.Stats -> StatsRoute(repository = repository)
+                AppTab.Data -> DataRoute(repository = repository)
             }
         }
     }

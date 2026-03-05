@@ -4,9 +4,12 @@ import com.jerry.magicledger.data.TransactionType
 import com.jerry.magicledger.data.db.AppDatabase
 import com.jerry.magicledger.data.db.BudgetEntity
 import com.jerry.magicledger.data.db.CategoryEntity
+import androidx.room.withTransaction
 import com.jerry.magicledger.data.db.TransactionEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -129,6 +132,186 @@ class LedgerRepositoryImpl(
                 monthKey = month.toMonthKey(),
                 budgetAmount = budgetAmount,
             ),
+        )
+    }
+
+    override suspend fun exportDataAsJson(): String {
+        val categories = categoryDao.getAllEntities()
+        val categoryById = categories.associateBy { it.id }
+        val budgets = budgetDao.getAllEntities()
+        val transactions = transactionDao.getAllEntities()
+
+        val root = JSONObject()
+        root.put("version", 1)
+        root.put("exportedAt", System.currentTimeMillis())
+
+        val categoryArray = JSONArray().apply {
+            categories.forEach {
+                put(
+                    JSONObject()
+                        .put("name", it.name)
+                        .put("type", it.type.name)
+                        .put("isPreset", it.isPreset),
+                )
+            }
+        }
+
+        val budgetArray = JSONArray().apply {
+            budgets.forEach {
+                put(
+                    JSONObject()
+                        .put("monthKey", it.monthKey)
+                        .put("budgetAmount", it.budgetAmount),
+                )
+            }
+        }
+
+        val transactionArray = JSONArray().apply {
+            transactions.forEach {
+                val category = categoryById[it.categoryId]
+                put(
+                    JSONObject()
+                        .put("amount", it.amount)
+                        .put("type", it.type.name)
+                        .put("categoryName", category?.name ?: "Unknown")
+                        .put("note", it.note)
+                        .put("dateMillis", it.dateMillis),
+                )
+            }
+        }
+
+        root.put("categories", categoryArray)
+        root.put("budgets", budgetArray)
+        root.put("transactions", transactionArray)
+
+        return root.toString(2)
+    }
+
+    override suspend fun importDataFromJson(rawJson: String): ImportResult {
+        val root = JSONObject(rawJson)
+        val categoriesRaw = root.optJSONArray("categories") ?: JSONArray()
+        val budgetsRaw = root.optJSONArray("budgets") ?: JSONArray()
+        val transactionsRaw = root.optJSONArray("transactions") ?: JSONArray()
+
+        val importedCategories = mutableListOf<CategoryEntity>()
+        for (index in 0 until categoriesRaw.length()) {
+            val item = categoriesRaw.optJSONObject(index) ?: continue
+            val name = item.optString("name").trim()
+            val typeName = item.optString("type").uppercase()
+            if (name.isBlank()) {
+                continue
+            }
+            val type = runCatching { TransactionType.valueOf(typeName) }.getOrNull() ?: continue
+            importedCategories += CategoryEntity(
+                name = name,
+                type = type,
+                isPreset = item.optBoolean("isPreset", false),
+            )
+        }
+
+        val importedBudgets = mutableListOf<BudgetEntity>()
+        for (index in 0 until budgetsRaw.length()) {
+            val item = budgetsRaw.optJSONObject(index) ?: continue
+            val monthKey = item.optString("monthKey").trim()
+            val budgetAmount = item.optDouble("budgetAmount", Double.NaN)
+            if (monthKey.isBlank() || budgetAmount.isNaN()) {
+                continue
+            }
+            importedBudgets += BudgetEntity(
+                monthKey = monthKey,
+                budgetAmount = budgetAmount,
+            )
+        }
+
+        data class ImportedTx(
+            val amount: Double,
+            val type: TransactionType,
+            val categoryName: String,
+            val note: String,
+            val dateMillis: Long,
+        )
+
+        val importedTransactions = mutableListOf<ImportedTx>()
+        for (index in 0 until transactionsRaw.length()) {
+            val item = transactionsRaw.optJSONObject(index) ?: continue
+            val amount = item.optDouble("amount", Double.NaN)
+            val typeName = item.optString("type").uppercase()
+            val categoryName = item.optString("categoryName").trim()
+            val note = item.optString("note")
+            val dateMillis = item.optLong("dateMillis", -1L)
+            if (amount.isNaN() || categoryName.isBlank() || dateMillis <= 0L) {
+                continue
+            }
+            val type = runCatching { TransactionType.valueOf(typeName) }.getOrNull() ?: continue
+            importedTransactions += ImportedTx(
+                amount = amount,
+                type = type,
+                categoryName = categoryName,
+                note = note,
+                dateMillis = dateMillis,
+            )
+        }
+
+        var writtenCategoryCount = 0
+        var writtenBudgetCount = 0
+        var writtenTransactionCount = 0
+
+        database.withTransaction {
+            transactionDao.deleteAll()
+            budgetDao.deleteAll()
+            categoryDao.deleteAll()
+
+            val categoryMap = linkedMapOf<Pair<String, TransactionType>, Long>()
+
+            val dedupedCategories = importedCategories
+                .distinctBy { it.name.lowercase() to it.type }
+                .sortedBy { it.name }
+
+            dedupedCategories.forEach { category ->
+                val id = categoryDao.insert(category)
+                categoryMap[category.name.lowercase() to category.type] = id
+            }
+            writtenCategoryCount = dedupedCategories.size
+
+            importedBudgets.forEach { budgetDao.upsert(it) }
+            writtenBudgetCount = importedBudgets.size
+
+            val txEntities = importedTransactions.mapNotNull { tx ->
+                val categoryId = categoryMap[tx.categoryName.lowercase() to tx.type]
+                    ?: run {
+                        val fallbackCategoryId = categoryMap["其他" to tx.type]
+                        if (fallbackCategoryId != null) {
+                            fallbackCategoryId
+                        } else {
+                            val newId = categoryDao.insert(
+                                CategoryEntity(
+                                    name = "其他",
+                                    type = tx.type,
+                                    isPreset = false,
+                                ),
+                            )
+                            categoryMap["其他" to tx.type] = newId
+                            writtenCategoryCount += 1
+                            newId
+                        }
+                    }
+                TransactionEntity(
+                    amount = tx.amount,
+                    type = tx.type,
+                    categoryId = categoryId,
+                    note = tx.note,
+                    dateMillis = tx.dateMillis,
+                )
+            }
+
+            transactionDao.insertAll(txEntities)
+            writtenTransactionCount = txEntities.size
+        }
+
+        return ImportResult(
+            categoryCount = writtenCategoryCount,
+            transactionCount = writtenTransactionCount,
+            budgetCount = writtenBudgetCount,
         )
     }
 
