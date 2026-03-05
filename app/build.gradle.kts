@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
 }
 
+kotlin {
+    jvmToolchain(11)
+}
+
 android {
     namespace = "com.jerry.magicledger"
     compileSdk = 33
