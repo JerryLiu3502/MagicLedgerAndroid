@@ -20,6 +20,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -105,7 +106,10 @@ private fun HomeScreen(viewModel: HomeViewModel) {
             }
         } else {
             items(uiState.groupedTransactions) { group ->
-                TransactionDayGroupCard(group = group)
+                TransactionDayGroupCard(
+                    group = group,
+                    onDeleteClick = viewModel::deleteTransaction,
+                )
             }
         }
     }
@@ -238,7 +242,10 @@ private fun AddTransactionCard(
 }
 
 @Composable
-private fun TransactionDayGroupCard(group: TransactionDayGroup) {
+private fun TransactionDayGroupCard(
+    group: TransactionDayGroup,
+    onDeleteClick: (Long) -> Unit,
+) {
     Card {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -281,11 +288,16 @@ private fun TransactionDayGroupCard(group: TransactionDayGroup) {
                     }
                     val isIncome = item.type == TransactionType.INCOME
                     val sign = if (isIncome) "+" else "-"
-                    Text(
-                        text = "$sign${item.amount.toMoneyText()}",
-                        color = if (isIncome) Color(0xFF2E7D32) else Color(0xFFC62828),
-                        fontWeight = FontWeight.Medium,
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "$sign${item.amount.toMoneyText()}",
+                            color = if (isIncome) Color(0xFF2E7D32) else Color(0xFFC62828),
+                            fontWeight = FontWeight.Medium,
+                        )
+                        TextButton(onClick = { onDeleteClick(item.id) }) {
+                            Text("删除")
+                        }
+                    }
                 }
             }
         }

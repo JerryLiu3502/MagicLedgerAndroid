@@ -185,6 +185,13 @@ class HomeViewModel(
         }
     }
 
+    fun deleteTransaction(transactionId: Long) {
+        viewModelScope.launch {
+            repository.deleteTransaction(transactionId)
+            infoText.value = "已删除记录"
+        }
+    }
+
     companion object {
         fun factory(repository: LedgerRepository): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
